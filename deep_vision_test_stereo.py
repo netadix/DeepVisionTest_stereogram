@@ -3,6 +3,7 @@ from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 import time
+import random  # ランダム関数をインポート
 
 # 初期設定
 pygame.init()
@@ -12,8 +13,10 @@ pygame.display.set_mode(display, DOUBLEBUF | OPENGL | RESIZABLE)  # RESIZABLEフ
 # フォントの設定
 font = pygame.font.Font(None, 36)  # サイズ36のデフォルトフォント
 
-# 初期の棒の高さ
+# 初期の棒の高さと幅
 cube_height = 30
+initial_cube_width = random.uniform(0.5, 1.5)  # 初期の棒の幅をランダムに設定
+central_cube_width = 1.0  # 真ん中の棒の幅は一定
 background_color = (0, 0, 0)  # 初期の背景色は黒
 cube_color = (0.5, 0.5, 0.5)  # 初期の棒の色は灰色
 g_key_pressed = False  # 'g' キーが押されているかどうかを追跡するフラグ
@@ -37,19 +40,19 @@ def setup_viewpoint(offset_x, width, height):
     glTranslatef(offset_x, 0.0, -20)  # 視点を左右にオフセット
 
 # 棒の描画
-def draw_cube(x, y, z, height):
+def draw_cube(x, y, z, height, width):
     glBegin(GL_QUADS)
     glColor3fv(cube_color)  # 棒の色を設定
     # 上面
-    glVertex3f(x - 0.8, y - height / 2, z)
-    glVertex3f(x + 0.8, y - height / 2, z)
-    glVertex3f(x + 0.8, y + height / 2, z)
-    glVertex3f(x - 0.8, y + height / 2, z)
+    glVertex3f(x - width, y - height / 2, z)
+    glVertex3f(x + width, y - height / 2, z)
+    glVertex3f(x + width, y + height / 2, z)
+    glVertex3f(x - width, y + height / 2, z)
     glEnd()
 
 # メインループ
 def main():
-    global cube_height, background_color, cube_color, g_key_pressed
+    global cube_height, background_color, cube_color, g_key_pressed, initial_cube_width
     start_time = time.time()
     central_pos = -10
     direction = 1  # 初期方向（前進）
@@ -61,6 +64,9 @@ def main():
 
     # 視点のオフセット（視差）を設定
     offset_x = 0.6  # 左右の視点間のズレを設定
+
+    # 初期の両端の棒の太さを設定
+    edge_cube_width = initial_cube_width
 
     running = True
     while running:
@@ -120,16 +126,16 @@ def main():
         # 左目の視点
         glViewport(0, 0, width // 2, height)
         setup_viewpoint(-offset_x, width, height)
-        draw_cube(-3, 0, -10, cube_height)
-        draw_cube(3, 0, -10, cube_height)
-        draw_cube(0, 0, central_pos, cube_height)
+        draw_cube(-4, 0, -10, cube_height, edge_cube_width)  # 左端の棒
+        draw_cube(4, 0, -10, cube_height, edge_cube_width)  # 右端の棒
+        draw_cube(0, 0, central_pos, cube_height, central_cube_width)  # 中央の棒
 
         # 右目の視点
         glViewport(width // 2, 0, width // 2, height)
         setup_viewpoint(offset_x, width, height)
-        draw_cube(-3, 0, -10, cube_height)
-        draw_cube(3, 0, -10, cube_height)
-        draw_cube(0, 0, central_pos, cube_height)
+        draw_cube(-4, 0, -10, cube_height, edge_cube_width)  # 左端の棒
+        draw_cube(4, 0, -10, cube_height, edge_cube_width)  # 右端の棒
+        draw_cube(0, 0, central_pos, cube_height, central_cube_width)  # 中央の棒
 
         pygame.display.flip()
 
