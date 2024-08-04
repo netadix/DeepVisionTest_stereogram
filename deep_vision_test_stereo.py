@@ -3,23 +3,27 @@ from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 import time
-import random  # ランダム関数をインポート
+import random  # ランダムモジュールをインポート
 
 # 初期設定
 pygame.init()
 display = (1600, 600)
+pygame.display.gl_set_attribute(GL_MULTISAMPLEBUFFERS, 1)
+pygame.display.gl_set_attribute(GL_MULTISAMPLESAMPLES, 4)  # サンプル数
 pygame.display.set_mode(display, DOUBLEBUF | OPENGL | RESIZABLE)  # RESIZABLEフラグを追加
 
 # フォントの設定
 font = pygame.font.Font(None, 36)  # サイズ36のデフォルトフォント
 
-# 初期の棒の高さと幅
-cube_height = 30
-initial_cube_width = random.uniform(0.5, 1.5)  # 初期の棒の幅をランダムに設定
-central_cube_width = 1.0  # 真ん中の棒の幅は一定
+# 初期の円柱の高さと太さ
+cylinder_height = 30
+cylinder_radius = 0.5  # 初期の円柱の半径
 background_color = (0, 0, 0)  # 初期の背景色は黒
-cube_color = (0.5, 0.5, 0.5)  # 初期の棒の色は灰色
+cylinder_color = (0.5, 0.5, 0.5)  # 初期の円柱の色は灰色
 g_key_pressed = False  # 'g' キーが押されているかどうかを追跡するフラグ
+
+# 外側の円柱の太さ（起動時にランダムに設定）
+outer_cylinder_radius = random.uniform(0.7, 1.5) * cylinder_radius
 
 # テキストの描画
 def draw_text(text, position):
@@ -39,20 +43,30 @@ def setup_viewpoint(offset_x, width, height):
     glLoadIdentity()
     glTranslatef(offset_x, 0.0, -20)  # 視点を左右にオフセット
 
-# 棒の描画
-def draw_cube(x, y, z, height, width):
-    glBegin(GL_QUADS)
-    glColor3fv(cube_color)  # 棒の色を設定
-    # 上面
-    glVertex3f(x - width, y - height / 2, z)
-    glVertex3f(x + width, y - height / 2, z)
-    glVertex3f(x + width, y + height / 2, z)
-    glVertex3f(x - width, y + height / 2, z)
-    glEnd()
+# 照明の設定
+def setup_lighting():
+    glEnable(GL_LIGHTING)
+    glEnable(GL_LIGHT0)
+    glLightfv(GL_LIGHT0, GL_POSITION, [10, 10, 10, 1])  # 光源の位置
+    glLightfv(GL_LIGHT0, GL_AMBIENT, [0.1, 0.1, 0.1, 1.0])  # 環境光
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.7, 0.7, 0.7, 1.0])  # 拡散光
+    glLightfv(GL_LIGHT0, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])  # 鏡面反射光
+
+# 円柱の描画
+def draw_cylinder(x, y, z, height, radius):
+    glPushMatrix()
+    glTranslatef(x, y, z)
+    glRotatef(90, 1, 0, 0)  # x軸を中心に90度回転
+    glColor3fv(cylinder_color)
+    quadric = gluNewQuadric()
+    gluQuadricNormals(quadric, GLU_SMOOTH)  # スムーズシェーディングを有効にする
+    gluCylinder(quadric, radius, radius, height, 32, 32)
+    gluDeleteQuadric(quadric)
+    glPopMatrix()
 
 # メインループ
 def main():
-    global cube_height, background_color, cube_color, g_key_pressed, initial_cube_width
+    global cylinder_height, cylinder_radius, background_color, cylinder_color, g_key_pressed, outer_cylinder_radius
     start_time = time.time()
     central_pos = -10
     direction = 1  # 初期方向（前進）
@@ -65,8 +79,16 @@ def main():
     # 視点のオフセット（視差）を設定
     offset_x = 0.6  # 左右の視点間のズレを設定
 
-    # 初期の両端の棒の太さを設定
-    edge_cube_width = initial_cube_width
+    # 照明を設定
+    glEnable(GL_DEPTH_TEST)
+    setup_lighting()
+
+    print("操作説明:")
+    print("スペースキー: 実行を停止し、反応時間と精度を表示")
+    print("sキー: 円柱の高さを1.1倍にする")
+    print("xキー: 円柱の高さを1/1.1にする")
+    print("gキー: 円柱の色と背景色を変化させる")
+    print("bキー: 初期状態に戻す")
 
     running = True
     while running:
@@ -86,27 +108,25 @@ def main():
                     elapsed_time = time.time() - start_time
                     accuracy = abs(central_pos + 10)  # 基準位置はz = -10
                     print(f"反応時間: {elapsed_time:.2f}秒, 精度: {accuracy:.2f}単位")
-                    pygame.time.wait(2000)
                     running = False
                 elif event.key == pygame.K_s:
-                    cube_height *= 1.5  # 縦のサイズを1.5倍に
-                    print(f"棒の高さが {cube_height:.2f} に増加しました")
+                    cylinder_height *= 1.1  # 縦のサイズを1.5倍に
+                    print(f"円柱の高さが {cylinder_height:.2f} に増加しました")
                 elif event.key == pygame.K_x:
-                    cube_height /= 1.5  # 縦のサイズを1/1.5に
-                    print(f"棒の高さが {cube_height:.2f} に減少しました")
+                    cylinder_height /= 1.1  # 縦のサイズを1/1.5に
+                    print(f"円柱の高さが {cylinder_height:.2f} に減少しました")
                 elif event.key == pygame.K_g:
                     g_key_pressed = True
                 elif event.key == pygame.K_b:
-                    # 任意の追加操作（例: gキーが押されている時の動作をリセットする）
                     g_key_pressed = False
                     background_color = (0, 0, 0)  # 背景色を黒に
-                    cube_color = (0.5, 0.5, 0.5)  # 棒の色を灰色に
+                    cylinder_color = (0.5, 0.5, 0.5)  # 円柱の色を灰色に
 
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_g:
                     g_key_pressed = False
                     background_color = (0, 0, 0)  # 背景色を黒に
-                    cube_color = (0.5, 0.5, 0.5)  # 棒の色を灰色に
+                    cylinder_color = (0.5, 0.5, 0.5)  # 円柱の色を灰色に
 
         if g_key_pressed:
             distance_from_center = abs(central_pos + 10)
@@ -118,7 +138,7 @@ def main():
                 background_color = (1, 0, 0)  # 赤色
         else:
             background_color = (0, 0, 0)  # 背景色を黒に
-            cube_color = (0.5, 0.5, 0.5)  # 棒の色を灰色に
+            cylinder_color = (0.5, 0.5, 0.5)  # 円柱の色を灰色に
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glClearColor(*background_color, 1)  # 背景色を設定
@@ -126,34 +146,28 @@ def main():
         # 左目の視点
         glViewport(0, 0, width // 2, height)
         setup_viewpoint(-offset_x, width, height)
-        draw_cube(-4, 0, -10, cube_height, edge_cube_width)  # 左端の棒
-        draw_cube(4, 0, -10, cube_height, edge_cube_width)  # 右端の棒
-        draw_cube(0, 0, central_pos, cube_height, central_cube_width)  # 中央の棒
+        draw_cylinder(-3, 20, -10, cylinder_height, outer_cylinder_radius)
+        draw_cylinder(0, 20, central_pos, cylinder_height, cylinder_radius)
+        draw_cylinder(3, 20, -10, cylinder_height, outer_cylinder_radius)
 
         # 右目の視点
         glViewport(width // 2, 0, width // 2, height)
         setup_viewpoint(offset_x, width, height)
-        draw_cube(-4, 0, -10, cube_height, edge_cube_width)  # 左端の棒
-        draw_cube(4, 0, -10, cube_height, edge_cube_width)  # 右端の棒
-        draw_cube(0, 0, central_pos, cube_height, central_cube_width)  # 中央の棒
+        draw_cylinder(-3, 20, -10, cylinder_height, outer_cylinder_radius)
+        draw_cylinder(0, 20, central_pos, cylinder_height, cylinder_radius)
+        draw_cylinder(3, 20, -10, cylinder_height, outer_cylinder_radius)
 
         pygame.display.flip()
 
-        # 棒の位置を更新
+        # 円柱の位置を更新
         delta_time = clock.tick(60) / 1000.0  # 経過時間を秒単位で取得
         central_pos += speed * direction * delta_time
 
-        # 棒の方向を変更
+        # 円柱の方向を変更
         if central_pos > -2 or central_pos < -18:
             direction *= -1
 
     pygame.quit()
 
 if __name__ == "__main__":
-    print("操作説明:")
-    print("  SPACE: テストを終了し、反応時間と精度を表示")
-    print("  S: 棒の高さを1.5倍に増加")
-    print("  X: 棒の高さを1/1.5に減少")
-    print("  G: 背景色と棒の色を変更（緑色範囲: 0.5単位以内、黄色範囲: 1.0単位以内、赤色範囲: それ以外）")
-    print("  B: Gキーの影響をリセットし、背景色を黒にし、棒の色を灰色に")
     main()
